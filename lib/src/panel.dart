@@ -159,6 +159,11 @@ class SlidingUpPanel extends StatefulWidget {
   /// by default the Panel is open and must be swiped closed by the user.
   final PanelState defaultPanelState;
 
+  /// Sliding gestures are enabled if using the default value of true. When set to
+  /// false the handlers [_onGestureSlide] and [_onGestureEnd] won't be called and
+  /// the panel will not respond to sliding gestures
+  final bool gestureSlidingEnabled;
+
   SlidingUpPanel(
       {Key? key,
       this.panel,
@@ -195,7 +200,8 @@ class SlidingUpPanel extends StatefulWidget {
       this.slideDirection = SlideDirection.UP,
       this.defaultPanelState = PanelState.CLOSED,
       this.header,
-      this.footer})
+      this.footer,
+      this.gestureSlidingEnabled = true})
       : assert(panel != null || panelBuilder != null),
         assert(0 <= backdropOpacity && backdropOpacity <= 1.0),
         assert(snapPoint == null || 0 < snapPoint && snapPoint < 1.0),
@@ -444,23 +450,40 @@ class _SlidingUpPanelState extends State<SlidingUpPanel>
 
     if (widget.panel != null) {
       return GestureDetector(
-        onVerticalDragUpdate: (DragUpdateDetails dets) =>
-            _onGestureSlide(dets.delta.dy),
-        onVerticalDragEnd: (DragEndDetails dets) =>
-            _onGestureEnd(dets.velocity),
+        onVerticalDragUpdate: (DragUpdateDetails dets) {
+          if (widget.gestureSlidingEnabled) {
+            _onGestureSlide(dets.delta.dy);
+          }
+        },
+        onVerticalDragEnd: (DragEndDetails dets) {
+          if (widget.gestureSlidingEnabled) {
+            _onGestureEnd(dets.velocity);
+          }
+        },
         child: child,
       );
     }
 
     return Listener(
-      onPointerDown: (PointerDownEvent p) =>
-          _vt.addPosition(p.timeStamp, p.position),
-      onPointerMove: (PointerMoveEvent p) {
-        _vt.addPosition(p.timeStamp,
-            p.position); // add current position for velocity tracking
-        _onGestureSlide(p.delta.dy);
+      onPointerDown: (PointerDownEvent p) {
+        if (widget.gestureSlidingEnabled) {
+          _vt.addPosition(p.timeStamp, p.position);
+        }
       },
-      onPointerUp: (PointerUpEvent p) => _onGestureEnd(_vt.getVelocity()),
+      onPointerMove: (PointerMoveEvent p) {
+        if (widget.gestureSlidingEnabled) {
+          _vt.addPosition(
+            p.timeStamp,
+            p.position,
+          ); // add current position for velocity tracking
+          _onGestureSlide(p.delta.dy);
+        }
+      },
+      onPointerUp: (PointerUpEvent p) {
+        if (widget.gestureSlidingEnabled) {
+          _onGestureEnd(_vt.getVelocity());
+        }
+      },
       child: child,
     );
   }
