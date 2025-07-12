@@ -131,6 +131,12 @@ class SlidingUpPanel extends StatefulWidget {
   /// is fully collapsed.
   final VoidCallback? onPanelClosed;
 
+  /// A callback that fires after the panel has opened and the layout for its
+  /// children has been calculated. This is the recommended callback for initiating
+  /// animations on a [ScrollController] within the panel, as it guarantees
+  /// that the controller's `maxScrollExtent` is up-to-date.
+  final VoidCallback? onPanelReady;
+
   /// If non-null and true, the SlidingUpPanel exhibits a
   /// parallax effect as the panel slides up. Essentially,
   /// the body slides up as the panel slides up.
@@ -197,6 +203,7 @@ class SlidingUpPanel extends StatefulWidget {
       this.onPanelSlide,
       this.onPanelOpened,
       this.onPanelClosed,
+      this.onPanelReady,
       this.parallaxEnabled = false,
       this.parallaxOffset = 0.1,
       this.isDraggable = true,
@@ -231,32 +238,51 @@ class _SlidingUpPanelState extends State<SlidingUpPanel>
   @override
   void initState() {
     super.initState();
-    _isPanelVisible =
-        widget.defaultPanelState == PanelState.HIDDEN ? false : true;
+
     _ac = AnimationController(
-        vsync: this,
-        duration: const Duration(milliseconds: 300),
-        value: widget.defaultPanelState == PanelState.CLOSED
-            ? 0.0
-            : 1.0 //set the default panel state (i.e. set initial value of _ac)
-        )
-      ..addListener(() {
-        if (widget.onPanelSlide != null) widget.onPanelSlide!(_ac.value);
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+      value: widget.defaultPanelState == PanelState.CLOSED ? 0.0 : 1.0,
+    )
+    // The main listener is still useful for onPanelSlide
+    ..addListener(() {
+      if (widget.onPanelSlide != null) {
+        widget.onPanelSlide!(_ac.value);
+      }
+    })
+    // **** START OF MODIFICATION ****
+    // We add a status listener to reliably trigger callbacks on completion.
+    ..addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        // This block executes when the panel has fully opened.
 
-        if (widget.onPanelOpened != null && _ac.value == 1.0)
+        // 1. Fire the original onPanelOpened callback immediately for backwards compatibility.
+        if (widget.onPanelOpened != null) {
           widget.onPanelOpened!();
+        }
 
-        if (widget.onPanelClosed != null &&
-            _ac.value == 0.0 &&
-            !_ac.isAnimating) widget.onPanelClosed!();
-      });
+        // 2. Schedule our NEW onPanelReady callback to run AFTER the layout pass.
+        if (widget.onPanelReady != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) { // Ensure the widget is still in the tree
+              widget.onPanelReady!();
+            }
+          });
+        }
+      } else if (status == AnimationStatus.dismissed) {
+        // This block executes when the panel has fully closed.
+        if (widget.onPanelClosed != null) {
+          widget.onPanelClosed!();
+        }
+      }
+    });
+  
 
-    // CORRECTION 3: The essential change.
-    // If a controller is provided by the widget, use it.
-    // Otherwise, create a new one for internal use.
-    _childScrollController = widget.childScrollController ?? ScrollController();
-    _childScrollController.addListener(() {
-      if (widget.isDraggable && !_scrollingEnabled) _childScrollController.jumpTo(0);
+    _isPanelVisible = widget.defaultPanelState != PanelState.HIDDEN;
+
+    _sc = widget.childScrollController ?? ScrollController();
+    _sc.addListener(() {
+      if (widget.isDraggable && !_scrollingEnabled) _sc.jumpTo(0);
     });
 
     widget.controller?._addState(this);
