@@ -197,6 +197,7 @@ class SlidingUpPanel extends StatefulWidget {
       this.parallaxEnabled = false,
       this.parallaxOffset = 0.1,
       this.isDraggable = true,
+      this.childScrollController,
       this.slideDirection = SlideDirection.UP,
       this.defaultPanelState = PanelState.CLOSED,
       this.header,
@@ -214,7 +215,7 @@ class SlidingUpPanel extends StatefulWidget {
 class _SlidingUpPanelState extends State<SlidingUpPanel>
     with SingleTickerProviderStateMixin {
   late AnimationController _ac;
-  late ScrollController _sc;
+  ScrollController childScrollController;
 
   bool _scrollingEnabled = false;
   VelocityTracker _vt = new VelocityTracker.withKind(PointerDeviceKind.touch);
@@ -246,9 +247,9 @@ class _SlidingUpPanelState extends State<SlidingUpPanel>
 
     // prevent the panel content from being scrolled only if the widget is
     // draggable and panel scrolling is enabled
-    _sc = new ScrollController();
-    _sc.addListener(() {
-      if (widget.isDraggable && !_scrollingEnabled) _sc.jumpTo(0);
+    childScrollController = new ScrollController();
+    childScrollController.addListener(() {
+      if (widget.isDraggable && !_scrollingEnabled) childScrollController.jumpTo(0);
     });
 
     widget.controller?._addState(this);
@@ -357,7 +358,7 @@ class _SlidingUpPanelState extends State<SlidingUpPanel>
                             height: widget.maxHeight,
                             child: widget.panel != null
                                 ? widget.panel
-                                : widget.panelBuilder!(_sc),
+                                : widget.panelBuilder!(childScrollController),
                           )),
 
                       // header
@@ -503,7 +504,7 @@ class _SlidingUpPanelState extends State<SlidingUpPanel>
     // if the panel is open and the user hasn't scrolled, we need to determine
     // whether to enable scrolling if the user swipes up, or disable closing and
     // begin to close the panel if the user swipes down
-    if (_isPanelOpen && _sc.hasClients && _sc.offset <= 0) {
+    if (_isPanelOpen && childScrollController.hasClients && childScrollController.offset <= 0) {
       setState(() {
         if (dy < 0) {
           _scrollingEnabled = true;
@@ -608,7 +609,7 @@ class _SlidingUpPanelState extends State<SlidingUpPanel>
   //close the panel
   Future<void> _close() async {
     return _ac.fling(velocity: -1.0).then((x) {
-      _sc.jumpTo(0);
+      childScrollController.jumpTo(0);
       _scrollingEnabled = false;
     });
   }
