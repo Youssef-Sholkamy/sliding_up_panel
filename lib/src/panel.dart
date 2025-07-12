@@ -164,6 +164,8 @@ class SlidingUpPanel extends StatefulWidget {
   /// the panel will not respond to sliding gestures
   final bool gestureSlidingEnabled;
 
+  final ScrollController childScrollController;
+
   SlidingUpPanel(
       {Key? key,
       this.panel,
